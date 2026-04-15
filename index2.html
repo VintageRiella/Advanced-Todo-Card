@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo Card Stage 1</title>
+
+<style>
+body { font-family: sans-serif; background:#f5f5f5; padding:20px; }
+
+article {
+  max-width:500px; margin:auto; background:#fff; padding:16px;
+  border-radius:12px; border:1px solid #ddd; display:flex; flex-direction:column; gap:10px;
+}
+
+/* Priority indicator */
+.priority-indicator { width:6px; border-radius:6px; }
+.priority-high { background:red; }
+.priority-medium { background:orange; }
+.priority-low { background:green; }
+
+.header { display:flex; gap:10px; }
+
+.done { text-decoration: line-through; opacity:0.6; }
+
+.badge { padding:4px 8px; border-radius:6px; color:#fff; font-size:12px; }
+.status-pending { background:#999; }
+.status-progress { background:#1890ff; }
+.status-done { background:#52c41a; }
+
+.overdue { color:red; font-weight:bold; }
+
+.tags { display:flex; flex-wrap:wrap; gap:6px; list-style:none; padding:0; }
+.tag { background:#eee; padding:4px 8px; border-radius:6px; }
+
+button, input, select, textarea {
+  padding:6px; border-radius:6px; border:1px solid #ccc;
+}
+
+.collapsed { max-height:40px; overflow:hidden; }
+
+.edit-form { display:flex; flex-direction:column; gap:10px; }
+
+button:focus, input:focus, select:focus, textarea:focus {
+  outline:2px solid black;
+}
+
+@media (min-width:768px){
+  .row { display:flex; gap:10px; }
+}
+</style>
+</head>
+
+<body>
+
+<article data-testid="test-todo-card">
+
+<div class="header">
+<div id="priorityIndicator"
+data-testid="test-todo-priority-indicator"
+class="priority-indicator priority-high"></div>
+
+<div style="flex:1">
+
+<h3 id="title" data-testid="test-todo-title">Finish UI Assignment</h3>
+
+<p id="desc" data-testid="test-todo-description" class="collapsed">
+This is a long description. It will collapse by default and expand when clicked.
+</p>
+
+<button id="expandBtn"
+data-testid="test-todo-expand-toggle"
+aria-expanded="false"
+aria-controls="collapsible">
+Expand
+</button>
+
+<div id="collapsible"
+data-testid="test-todo-collapsible-section"></div>
+
+<time id="dueDate" data-testid="test-todo-due-date"></time>
+
+<div id="time"
+data-testid="test-todo-time-remaining"
+aria-live="polite"></div>
+
+<div id="overdue"
+data-testid="test-todo-overdue-indicator"></div>
+
+<span id="status"
+data-testid="test-todo-status"
+class="badge status-progress">In Progress</span>
+
+<select id="statusControl"
+data-testid="test-todo-status-control">
+<option>Pending</option>
+<option selected>In Progress</option>
+<option>Done</option>
+</select>
+
+<ul class="tags" data-testid="test-todo-tags">
+<li data-testid="test-todo-tag-work" class="tag">work</li>
+<li data-testid="test-todo-tag-urgent" class="tag">urgent</li>
+</ul>
+
+<label>
+<input type="checkbox"
+id="checkbox"
+data-testid="test-todo-complete-toggle">
+Complete
+</label>
+
+<button id="editBtn" data-testid="test-todo-edit-button">Edit</button>
+<button id="deleteBtn" data-testid="test-todo-delete-button">Delete</button>
+
+</div>
+</div>
+
+<form id="editForm"
+data-testid="test-todo-edit-form"
+class="edit-form"
+hidden>
+
+<label>Title
+<input id="editTitle" data-testid="test-todo-edit-title-input">
+</label>
+
+<label>Description
+<textarea id="editDesc" data-testid="test-todo-edit-description-input"></textarea>
+</label>
+
+<label>Priority
+<select id="editPriority" data-testid="test-todo-edit-priority-select">
+<option>Low</option>
+<option>Medium</option>
+<option selected>High</option>
+</select>
+</label>
+
+<label>Due Date
+<input type="datetime-local"
+id="editDate"
+data-testid="test-todo-edit-due-date-input">
+</label>
+
+<button type="button"
+id="saveBtn"
+data-testid="test-todo-save-button">Save</button>
+
+<button type="button"
+id="cancelBtn"
+data-testid="test-todo-cancel-button">Cancel</button>
+
+</form>
+
+</article>
+
+<script>
+let state = {
+  title:"Finish UI Assignment",
+  desc:"This is a long description. It will collapse by default and expand when clicked.",
+  priority:"High",
+  status:"In Progress",
+  due:new Date("2026-03-01T18:00:00"),
+};
+
+let previousState = {};
+
+const el = id => document.getElementById(id);
+
+function updateUI(){
+  el("title").textContent = state.title;
+  el("desc").textContent = state.desc;
+
+  el("status").textContent = state.status;
+  el("status").className =
+    "badge " +
+    (state.status === "Done" ? "status-done" :
+     state.status === "Pending" ? "status-pending" : "status-progress");
+
+  el("priorityIndicator").className =
+    "priority-indicator priority-" + state.priority.toLowerCase();
+
+  el("checkbox").checked = state.status === "Done";
+  el("statusControl").value = state.status;
+
+  el("title").classList.toggle("done", state.status === "Done");
+
+  el("dueDate").textContent =
+    "Due " + state.due.toLocaleString();
+
+  if(state.status === "Done"){
+    el("time").textContent = "Completed";
+    el("overdue").textContent = "";
+    return;
+  }
+
+  const now = new Date();
+  const diff = state.due - now;
+
+  let text = "";
+
+  if(diff < 0){
+    const mins = Math.floor(Math.abs(diff)/60000);
+    const hours = Math.floor(mins/60);
+
+    text = hours > 0
+      ? `Overdue by ${hours} hours`
+      : `Overdue by ${mins} minutes`;
+
+    el("overdue").textContent = "Overdue";
+    el("overdue").className = "overdue";
+  } else {
+    const mins = Math.floor(diff/60000);
+    const hours = Math.floor(mins/60);
+    const days = Math.floor(hours/24);
+
+    if(days > 0) text = `Due in ${days} days`;
+    else if(hours > 0) text = `Due in ${hours} hours`;
+    else text = `Due in ${mins} minutes`;
+
+    el("overdue").textContent = "";
+  }
+
+  el("time").textContent = text;
+}
+
+setInterval(updateUI,60000);
+updateUI();
+
+/* STATUS SYNC */
+el("checkbox").onchange = () => {
+  state.status = el("checkbox").checked ? "Done" : "Pending";
+  updateUI();
+};
+
+el("statusControl").onchange = () => {
+  state.status = el("statusControl").value;
+  updateUI();
+};
+
+/* EXPAND */
+el("expandBtn").onclick = () => {
+  const desc = el("desc");
+  const expanded = desc.classList.toggle("collapsed");
+
+  el("expandBtn").setAttribute("aria-expanded", !expanded);
+  el("expandBtn").textContent = expanded ? "Expand" : "Collapse";
+};
+
+/* EDIT */
+el("editBtn").onclick = () => {
+  previousState = {...state};
+
+  el("editForm").hidden = false;
+
+  el("editTitle").value = state.title;
+  el("editDesc").value = state.desc;
+  el("editPriority").value = state.priority;
+  el("editDate").value = state.due.toISOString().slice(0,16);
+};
+
+el("saveBtn").onclick = () => {
+  state.title = el("editTitle").value;
+  state.desc = el("editDesc").value;
+  state.priority = el("editPriority").value;
+  state.due = new Date(el("editDate").value);
+
+  el("editForm").hidden = true;
+  updateUI();
+};
+
+el("cancelBtn").onclick = () => {
+  state = {...previousState};
+  el("editForm").hidden = true;
+  updateUI();
+};
+
+/* DELETE */
+el("deleteBtn").onclick = () => alert("Delete clicked");
+</script>
+
+</body>
+</html>
